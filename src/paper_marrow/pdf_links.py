@@ -42,7 +42,7 @@ class PdfAttachment:
 
 def pdf_link_name(filename: str, attachment_key: str) -> str:
     if not isinstance(filename, str):
-        raise PipelineError("Zotero attachment.filename 必须是字符串")
+        raise PipelineError("Zotero attachment.filename must be a string")
     stem = filename[:-4] if filename.lower().endswith(".pdf") else filename
     stem = _INVALID_FILENAME.sub(" - ", stem)
     stem = _WHITESPACE.sub(" ", stem).strip(" .-")
@@ -52,10 +52,10 @@ def pdf_link_name(filename: str, attachment_key: str) -> str:
 
 def file_uri_path(uri: str) -> Path:
     if not isinstance(uri, str) or not uri:
-        raise PipelineError("Zotero 没有返回附件文件地址")
+        raise PipelineError("Zotero returned no attachment file URL")
     parts = urlsplit(uri)
     if parts.scheme.lower() != "file" or parts.query or parts.fragment:
-        raise PipelineError(f"Zotero 附件地址不是纯 file URI：{uri}")
+        raise PipelineError(f"Zotero attachment URL is not a plain file URI: {uri}")
     decoded = unquote(parts.path)
     if os.name == "nt":
         if parts.netloc and parts.netloc.lower() != "localhost":
@@ -67,36 +67,36 @@ def file_uri_path(uri: str) -> Path:
         decoded = f"//{parts.netloc}{decoded}"
     path = Path(decoded)
     if not path.is_absolute():
-        raise PipelineError(f"Zotero 附件地址不是绝对路径：{uri}")
+        raise PipelineError(f"Zotero attachment URL is not an absolute path: {uri}")
     try:
         resolved = path.resolve(strict=True)
     except OSError as error:
-        raise PipelineError(f"Zotero PDF 尚未下载或文件不存在：{path}") from error
+        raise PipelineError(f"Zotero PDF is not downloaded or the file is missing: {path}") from error
     if not resolved.is_file():
-        raise PipelineError(f"Zotero PDF 目标不是普通文件：{resolved}")
+        raise PipelineError(f"Zotero PDF target is not a regular file: {resolved}")
     return resolved
 
 
 def _attachment(child: object, parent_key: str) -> PdfAttachment | None:
     if not isinstance(child, dict):
-        raise PipelineError("Zotero child item 不是对象")
+        raise PipelineError("Zotero child item is not an object")
     data = child.get("data")
     if not isinstance(data, dict):
-        raise PipelineError("Zotero child item 缺少 data 对象")
+        raise PipelineError("Zotero child item lacks a data object")
     if data.get("itemType") != "attachment":
         return None
     if data.get("parentItem") != parent_key:
-        raise PipelineError("Zotero attachment.parentItem 与父条目不一致")
+        raise PipelineError("Zotero attachment.parentItem does not match the parent item")
     attachment_key = key(data.get("key", ""))
     if child.get("key") != attachment_key:
-        raise PipelineError("Zotero attachment 外层 key 与 data.key 不一致")
+        raise PipelineError("Zotero attachment outer key does not match data.key")
     link_mode = data.get("linkMode")
     if link_mode not in _FILE_LINK_MODES:
         return None
     filename = data.get("filename", "")
     content_type = data.get("contentType", "")
     if not isinstance(filename, str) or not isinstance(content_type, str):
-        raise PipelineError(f"Zotero attachment {attachment_key} 的文件字段无效")
+        raise PipelineError(f"Zotero attachment {attachment_key} has invalid file fields")
     if content_type.lower() != "application/pdf" and not filename.lower().endswith(".pdf"):
         return None
     return PdfAttachment(attachment_key, filename)
@@ -126,7 +126,7 @@ def _create_symlink(link: Path, target: Path) -> None:
     except FileExistsError:
         raise
     except OSError as error:
-        raise PipelineError(f"无法创建 PDF 符号链接 {link}；Windows 请开启开发者模式") from error
+        raise PipelineError(f"cannot create PDF symlink {link}; on Windows enable Developer Mode") from error
 
 
 def ensure_pdf_link(folder: Path, attachment: PdfAttachment, target: Path) -> str:
@@ -135,14 +135,14 @@ def ensure_pdf_link(folder: Path, attachment: PdfAttachment, target: Path) -> st
     try:
         managed = [path for path in folder.iterdir() if path.is_symlink() and path.name.casefold().endswith(suffix)]
     except OSError as error:
-        raise PipelineError(f"无法扫描论文目录中的 PDF 链接：{folder}") from error
+        raise PipelineError(f"cannot scan PDF links in paper directory: {folder}") from error
     if len(managed) > 1:
-        raise FileExistsError(f"多个 PDF 链接声明同一 attachment key：{attachment.key}")
+        raise FileExistsError(f"multiple PDF links declare the same attachment key: {attachment.key}")
 
     if managed:
         current = managed[0]
         if current != desired and (desired.exists() or desired.is_symlink()):
-            raise FileExistsError(f"PDF 链接目标名称已存在：{desired}")
+            raise FileExistsError(f"PDF link target name already exists: {desired}")
         if current != desired:
             _create_symlink(desired, target)
             try:
@@ -157,7 +157,7 @@ def ensure_pdf_link(folder: Path, attachment: PdfAttachment, target: Path) -> st
         return "unchanged"
 
     if desired.exists() or desired.is_symlink():
-        raise FileExistsError(f"PDF 链接目标名称已存在：{desired}")
+        raise FileExistsError(f"PDF link target name already exists: {desired}")
     _create_symlink(desired, target)
     return "linked"
 
@@ -171,10 +171,10 @@ class PdfLinker:
         try:
             children = self.zotero.children(parent_key)
             if not isinstance(children, list):
-                raise PipelineError("Zotero children 响应不是列表")
+                raise PipelineError("Zotero children response is not a list")
         except (PipelineError, OSError, UnicodeError, ValueError, TypeError) as error:
             summary.failed += 1
-            summary.messages.append(f"论文 {parent_key} 无法读取附件：{error}")
+            summary.messages.append(f"cannot read attachments for paper {parent_key}: {error}")
             return summary
 
         attachments: list[PdfAttachment] = []
@@ -185,7 +185,7 @@ class PdfLinker:
                     attachments.append(attachment)
             except (PipelineError, OSError, UnicodeError, ValueError, TypeError) as error:
                 summary.failed += 1
-                summary.messages.append(f"论文 {parent_key} 的第 {position} 个附件失败：{error}")
+                summary.messages.append(f"attachment {position} of paper {parent_key} failed: {error}")
         if not attachments:
             if summary.failed == 0:
                 summary.missing += 1
@@ -201,10 +201,10 @@ class PdfLinker:
                     summary.unchanged += 1
             except FileExistsError as error:
                 summary.conflicts += 1
-                summary.messages.append(f"论文 {parent_key} 的 PDF 链接冲突：{error}")
+                summary.messages.append(f"PDF link conflict for paper {parent_key}: {error}")
             except (PipelineError, OSError, UnicodeError, ValueError, TypeError) as error:
                 summary.failed += 1
-                summary.messages.append(f"论文 {parent_key} 的附件 {attachment.key} 失败：{error}")
+                summary.messages.append(f"attachment {attachment.key} of paper {parent_key} failed: {error}")
         return summary
 
     def link_existing(self, vault: Path) -> PdfLinkSummary:
@@ -213,7 +213,7 @@ class PdfLinker:
         conflict_keys = set(index.conflicts)
         for item_key, paths in sorted(index.conflicts.items()):
             summary.conflicts += 1
-            summary.messages.append(f"本地 key 冲突 {item_key}：" + "，".join(str(path) for path in paths))
+            summary.messages.append(f"local key conflict {item_key}: " + ", ".join(str(path) for path in paths))
         for item_key, paths in sorted(index.complete.items()):
             if item_key in conflict_keys:
                 continue

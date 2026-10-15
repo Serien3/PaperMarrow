@@ -613,7 +613,7 @@ class PdfLinkTests(unittest.TestCase):
         self.assertEqual(shared["peak"], 4)
         self.assertEqual(len(shared["sessions"]), 6)
         self.assertEqual(len({id(session) for session in shared["sessions"]}), 6)
-        self.assertIn("PDF 链接进度：6/6", progress)
+        self.assertIn("PDF link progress: 6/6", progress)
 
     def test_sync_merges_concurrent_pdf_messages_in_item_order(self):
         entries = [item(f"PAPER{number:03d}") for number in range(1, 4)]
@@ -1132,21 +1132,21 @@ class ConversionServiceTests(unittest.TestCase):
         (ordinary / "Paper [PDFKEY01].pdf").write_bytes(b"%PDF")
         candidate = service.inspect("PAPER001", ordinary)
         self.assertEqual(candidate.status, "Unavailable")
-        self.assertIn("没有受管理", candidate.detail)
+        self.assertIn("no managed PDF symlink", candidate.detail)
 
         unmanaged = self.vault / "unmanaged"
         unmanaged.mkdir()
         (unmanaged / "paper.pdf").symlink_to(source)
         candidate = service.inspect("PAPER001", unmanaged)
         self.assertEqual(candidate.status, "Unavailable")
-        self.assertIn("没有受管理", candidate.detail)
+        self.assertIn("no managed PDF symlink", candidate.detail)
 
         broken = self.vault / "broken"
         broken.mkdir()
         (broken / "Paper [PDFKEY01].pdf").symlink_to(self.root / "absent.pdf")
         candidate = service.inspect("PAPER001", broken)
         self.assertEqual(candidate.status, "Unavailable")
-        self.assertIn("已经失效", candidate.detail)
+        self.assertIn("broken", candidate.detail)
 
         directory_target = self.vault / "directory-target"
         directory_target.mkdir()
@@ -1157,7 +1157,7 @@ class ConversionServiceTests(unittest.TestCase):
         )
         candidate = service.inspect("PAPER001", directory_target)
         self.assertEqual(candidate.status, "Unavailable")
-        self.assertIn("不是普通文件", candidate.detail)
+        self.assertIn("not a regular file", candidate.detail)
 
         multiple = self.vault / "multiple"
         multiple.mkdir()
@@ -1165,7 +1165,7 @@ class ConversionServiceTests(unittest.TestCase):
         (multiple / "Second [PDFKEY02].pdf").symlink_to(source)
         candidate = service.inspect("PAPER001", multiple)
         self.assertEqual(candidate.status, "Unavailable")
-        self.assertIn("有 2 个", candidate.detail)
+        self.assertIn("2 managed PDF symlinks", candidate.detail)
 
         ready = self.vault / "ready"
         ready.mkdir()
@@ -1189,7 +1189,7 @@ class ConversionServiceTests(unittest.TestCase):
         with patch("paper_marrow.conversion.convert_pdf_into_paper") as converter:
             summary = service.convert_selected(["PAPER001"], "token")
         self.assertEqual(summary.failed, 1)
-        self.assertIn("没有受管理", summary.messages[0])
+        self.assertIn("no managed PDF symlink", summary.messages[0])
         converter.assert_not_called()
 
     def test_output_conflicts_are_unavailable(self):
@@ -1200,7 +1200,7 @@ class ConversionServiceTests(unittest.TestCase):
         (invalid_full / "full.md").symlink_to(self.root / "absent.md")
         candidate = service.inspect("PAPER001", invalid_full)
         self.assertEqual(candidate.status, "Unavailable")
-        self.assertIn("full.md 不是普通文件", candidate.detail)
+        self.assertIn("full.md is not a regular file", candidate.detail)
 
         occupied_output = self.vault / "occupied-output"
         occupied_output.mkdir()
@@ -1214,7 +1214,7 @@ class ConversionServiceTests(unittest.TestCase):
         (invalid_temp / "temp").write_text("not a directory", encoding="utf-8")
         candidate = service.inspect("PAPER001", invalid_temp)
         self.assertEqual(candidate.status, "Unavailable")
-        self.assertIn("temp 不是普通目录", candidate.detail)
+        self.assertIn("temp is not a regular directory", candidate.detail)
 
     def test_duplicate_local_key_is_unavailable(self):
         for name in ("first", "second"):
@@ -1223,7 +1223,7 @@ class ConversionServiceTests(unittest.TestCase):
             (folder / "meta.md").write_text(render_meta(item()["data"]), encoding="utf-8")
         candidate = ConversionService(self.vault, self.config).list_candidates()[0]
         self.assertEqual(candidate.status, "Unavailable")
-        self.assertIn("多个论文目录", candidate.detail)
+        self.assertIn("multiple paper directories", candidate.detail)
 
     def test_selected_conversion_failure_does_not_block_later_key(self):
         entries = [item("PAPER001"), item("PAPER002")]
@@ -1379,9 +1379,9 @@ class AdapterAndCliTests(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertIn("created=1 skipped=0 conflicts=0 failed=0", output.getvalue())
             self.assertIn("pdf_linked=0 pdf_missing=1 pdf_failed=0", output.getvalue())
-            self.assertIn("本轮新增 key：PAPER001", output.getvalue())
-            self.assertIn("正在读取 Zotero Collection", progress.getvalue())
-            self.assertIn("PDF 链接进度：1/1", progress.getvalue())
+            self.assertIn("Keys added this run: PAPER001", output.getvalue())
+            self.assertIn("Reading Zotero Collection", progress.getvalue())
+            self.assertIn("PDF link progress: 1/1", progress.getvalue())
 
     def test_cli_sync_never_requires_mineru_token(self):
         with tempfile.TemporaryDirectory() as root:
@@ -1515,7 +1515,7 @@ class AdapterAndCliTests(unittest.TestCase):
                     ("convert", (["PAPER001"], "token")),
                 ],
             )
-            self.assertIn("正在检查论文转换状态", output.getvalue())
+            self.assertIn("Checking paper conversion status", output.getvalue())
             zotero_type.assert_not_called()
 
     def test_cli_bare_convert_cancel_never_loads_token(self):
@@ -1563,7 +1563,7 @@ class AdapterAndCliTests(unittest.TestCase):
                 service_type.return_value.list_candidates.return_value = []
                 result = main(["convert", "--vault", str(vault)])
             self.assertEqual(result, 0)
-            self.assertIn("没有已完成入库的论文", output.getvalue())
+            self.assertIn("No imported papers", output.getvalue())
             zotero_type.assert_not_called()
 
     def test_cli_bare_convert_rejects_non_interactive_terminal_before_zotero(self):
@@ -1623,7 +1623,7 @@ class AdapterAndCliTests(unittest.TestCase):
             with patch("paper_marrow.cli.Zotero", return_value=FakeZotero()), redirect_stdout(output):
                 result = main(["doctor", "--vault", str(vault)])
             self.assertEqual(result, 0)
-            self.assertIn("通过：PDF 符号链接", output.getvalue())
+            self.assertIn("OK: PDF symlinks", output.getvalue())
 
     def test_cli_has_no_removed_commands(self):
         for command in ("watch", "status", "select-pdf"):

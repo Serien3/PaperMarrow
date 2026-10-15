@@ -48,16 +48,16 @@ class Importer:
         self.zotero = zotero
 
     def sync(self, progress: Callable[[str], None] | None = None) -> ImportSummary:
-        self._report(progress, "正在读取 Zotero Collection……")
+        self._report(progress, "Reading Zotero Collection...")
         items = self.zotero.items(self.config.collection)
         if not isinstance(items, list):
-            raise PipelineError("Zotero Collection 响应不是条目列表")
+            raise PipelineError("Zotero Collection response is not a list of items")
         index = index_existing(self.vault)
         summary = ImportSummary()
         conflict_keys = set(index.conflicts)
         for item_key, paths in sorted(index.conflicts.items()):
             summary.conflicts += 1
-            summary.messages.append(f"本地 key 冲突 {item_key}：" + "，".join(str(path) for path in paths))
+            summary.messages.append(f"local key conflict {item_key}: " + ", ".join(str(path) for path in paths))
 
         candidates: list[tuple[str, dict]] = []
         counts: dict[str, int] = {}
@@ -71,16 +71,16 @@ class Importer:
                 counts[item_key] = counts.get(item_key, 0) + 1
             except (PipelineError, OSError, UnicodeError, ValueError, TypeError) as error:
                 summary.failed += 1
-                summary.messages.append(f"第 {position} 个 Zotero 条目失败：{error}")
+                summary.messages.append(f"Zotero item {position} failed: {error}")
         for item_key, count in sorted(counts.items()):
             if count > 1 and item_key not in conflict_keys:
                 summary.conflicts += 1
                 conflict_keys.add(item_key)
-                summary.messages.append(f"Zotero 响应包含重复 key：{item_key}")
+                summary.messages.append(f"Zotero response contains duplicate key: {item_key}")
 
         existing = index.keys
         pdf_tasks: list[tuple[str, Path]] = []
-        self._report(progress, f"正在处理 {len(candidates)} 个 Zotero 条目……")
+        self._report(progress, f"Processing {len(candidates)} Zotero items...")
         for item_key, data in candidates:
             try:
                 if item_key in conflict_keys:
@@ -95,7 +95,7 @@ class Importer:
                     else self.vault / paper_folder_name(item_key, data)
                 )
                 if folder.is_symlink():
-                    raise PipelineError(f"拒绝使用符号链接论文目录：{folder}")
+                    raise PipelineError(f"refusing to use a symlinked paper directory: {folder}")
                 meta_path = folder / "meta.md"
                 json_path = folder / "temp" / "zotero-item.json"
                 if meta_path.exists() or meta_path.is_symlink():
@@ -104,7 +104,7 @@ class Importer:
                 if json_path.parent.is_symlink() or (
                     json_path.parent.exists() and not json_path.parent.is_dir()
                 ):
-                    raise PipelineError(f"temp 不是普通目录：{json_path.parent}")
+                    raise PipelineError(f"temp is not a regular directory: {json_path.parent}")
 
                 source_data = data
                 if json_path.exists() or json_path.is_symlink():
@@ -132,7 +132,7 @@ class Importer:
                 pdf_tasks.append((item_key, folder))
             except (PipelineError, OSError, UnicodeError, ValueError, TypeError) as error:
                 summary.failed += 1
-                summary.messages.append(f"Zotero 条目 {item_key} 入库失败：{error}")
+                summary.messages.append(f"failed to import Zotero item {item_key}: {error}")
         self._link_created_papers(pdf_tasks, summary, progress)
         return summary
 
@@ -148,11 +148,11 @@ class Importer:
         workers = min(SYNC_PDF_WORKERS, total)
         self._report(
             progress,
-            f"本轮新增 {total} 篇论文，正在建立 PDF 链接（最多 {workers} 路并发）……",
+            f"Linking PDFs for {total} new papers (up to {workers} concurrent)...",
         )
         if workers == 1:
             results = [self._link_paper(*tasks[0])]
-            self._report(progress, "PDF 链接进度：1/1")
+            self._report(progress, "PDF link progress: 1/1")
         else:
             results: list[PdfLinkSummary | None] = [None] * total
             completed = 0
@@ -166,7 +166,7 @@ class Importer:
                     results[futures[future]] = future.result()
                     completed += 1
                     if completed == total or completed % interval == 0:
-                        self._report(progress, f"PDF 链接进度：{completed}/{total}")
+                        self._report(progress, f"PDF link progress: {completed}/{total}")
             except BaseException:
                 for future in futures:
                     future.cancel()
@@ -176,7 +176,7 @@ class Importer:
 
         for (item_key, _), result in zip(tasks, results):
             if result is None:
-                raise PipelineError(f"论文 {item_key} 的 PDF 链接任务没有返回结果")
+                raise PipelineError(f"PDF link task for paper {item_key} returned no result")
             summary.pdf_linked += result.linked
             summary.pdf_missing += result.missing
             summary.pdf_failed += result.failed + result.conflicts
@@ -190,7 +190,7 @@ class Importer:
             return PdfLinkSummary(
                 papers=1,
                 failed=1,
-                messages=[f"论文 {item_key} 无法读取附件：{error}"],
+                messages=[f"cannot read attachments for paper {item_key}: {error}"],
             )
 
     @staticmethod
@@ -201,14 +201,14 @@ class Importer:
     @staticmethod
     def _validate_item(item: object) -> tuple[str, dict]:
         if not isinstance(item, dict):
-            raise PipelineError("条目不是 JSON 对象")
+            raise PipelineError("item is not a JSON object")
         outer_key = key(item.get("key", ""))
         data = item.get("data")
         if not isinstance(data, dict):
-            raise PipelineError(f"条目 {outer_key} 缺少 data 对象")
+            raise PipelineError(f"item {outer_key} lacks a data object")
         inner_key = key(data.get("key", ""))
         if inner_key != outer_key:
-            raise PipelineError(f"条目外层 key 与 data.key 不一致：{outer_key} / {inner_key}")
+            raise PipelineError(f"item outer key does not match data.key: {outer_key} / {inner_key}")
         Importer._validate_data(outer_key, data)
         return outer_key, data
 
@@ -216,6 +216,6 @@ class Importer:
     def _validate_data(expected_key: str, data: dict) -> None:
         inner_key = key(data.get("key", ""))
         if inner_key != expected_key:
-            raise PipelineError(f"Zotero data.key 与目标 key 不一致：{inner_key} / {expected_key}")
+            raise PipelineError(f"Zotero data.key does not match the target key: {inner_key} / {expected_key}")
         if not isinstance(data.get("itemType"), str) or not data["itemType"].strip():
-            raise PipelineError(f"条目 {expected_key} 缺少有效 itemType")
+            raise PipelineError(f"item {expected_key} lacks a valid itemType")

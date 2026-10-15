@@ -143,7 +143,7 @@ class _CandidateControl(UIControl):
         visible = self.model.visible
         if not visible:
             lines: list[StyleAndTextTuples] = [
-                [("class:empty", "  没有匹配当前搜索的论文")]
+                [("class:empty", "  no papers match the current search")]
             ]
             cursor = Point(x=0, y=0)
         else:
@@ -264,28 +264,28 @@ def run_conversion_picker(
         event.app.exit(result=None)
 
     def header_text() -> str:
-        filtered = f" / {len(model.visible)} 匹配" if model.query else ""
+        filtered = f" / {len(model.visible)} matches" if model.query else ""
         return (
-            f"转换论文  |  {model.ready_count} Ready / {len(model.candidates)} 篇论文"
-            f" / 已选择 {len(model.selected)}{filtered}"
+            f"Convert papers  |  {model.ready_count} Ready / {len(model.candidates)} papers"
+            f" / {len(model.selected)} selected{filtered}"
         )
 
     def search_text() -> str:
-        return "无" if not model.query else model.query
+        return "none" if not model.query else model.query
 
     def detail_text() -> StyleAndTextTuples:
         candidate = model.current
         if candidate is None:
-            return [("class:detail", "详情：没有匹配项")]
+            return [("class:detail", "Detail: no matches")]
         return [
-            ("class:detail.label", "详情："),
+            ("class:detail.label", "Detail: "),
             ("class:detail", f"{candidate.status} — {candidate.detail}"),
         ]
 
     def toolbar_text() -> str:
         if get_app().layout.has_focus(search_control):
-            return "输入关键词实时筛选  Enter/Esc 返回列表  Ctrl+U 清空  Ctrl+C 取消"
-        return "↑↓ 移动  Space 选择  a 全选当前 Ready  / 搜索  Enter 继续  q 取消"
+            return "Type to filter  Enter/Esc back to list  Ctrl+U clear  Ctrl+C cancel"
+        return "↑↓ move  Space select  a select all Ready  / search  Enter continue  q cancel"
 
     list_view = HSplit(
         [
@@ -293,14 +293,14 @@ def run_conversion_picker(
             ConditionalContainer(
                 VSplit(
                     [
-                        Label("搜索：", width=Dimension.exact(6)),
+                        Label("Search: ", width=Dimension.exact(8)),
                         Window(search_control, height=1),
                     ]
                 ),
                 filter=has_focus(search_control),
             ),
             ConditionalContainer(
-                Label(lambda: f"搜索：{search_text()}", style="class:search"),
+                Label(lambda: f"Search: {search_text()}", style="class:search"),
                 filter=~has_focus(search_control),
             ),
             Window(
@@ -315,7 +315,7 @@ def run_conversion_picker(
                     height=Dimension(min=1, max=3),
                     wrap_lines=True,
                 ),
-                title="当前论文",
+                title="Current paper",
             ),
             Label(toolbar_text, style="class:toolbar"),
         ]
@@ -331,7 +331,7 @@ def run_conversion_picker(
     confirmation_view = HSplit(
         [
             Label(
-                lambda: f"将转换 {len(model.selected)} 篇论文，可能消耗 MinerU 额度。",
+                lambda: f"{len(model.selected)} papers will be converted; this may consume MinerU quota.",
                 style="class:warning",
             ),
             Frame(
@@ -340,10 +340,10 @@ def run_conversion_picker(
                     wrap_lines=False,
                     always_hide_cursor=True,
                 ),
-                title="已选择",
+                title="Selected",
             ),
             Label(
-                "y 确认转换   n/Esc 返回选择   Ctrl+C 取消",
+                "y confirm  n/Esc back to selection  Ctrl+C cancel",
                 style="class:toolbar",
             ),
         ]

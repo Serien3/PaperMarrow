@@ -49,30 +49,30 @@ class ConversionService:
     def inspect(self, item_key: str, folder: Path) -> ConversionCandidate:
         full_markdown = folder / "full.md"
         if full_markdown.is_file() and not full_markdown.is_symlink():
-            return ConversionCandidate(item_key, folder, "Converted", "full.md 已存在")
+            return ConversionCandidate(item_key, folder, "Converted", "full.md already exists")
         if full_markdown.exists() or full_markdown.is_symlink():
-            return ConversionCandidate(item_key, folder, "Unavailable", "full.md 不是普通文件")
+            return ConversionCandidate(item_key, folder, "Unavailable", "full.md is not a regular file")
         images = folder / "images"
         if images.exists() or images.is_symlink():
             return ConversionCandidate(
                 item_key,
                 folder,
                 "Unavailable",
-                "已有转换目标：images",
+                "conversion target already exists: images",
             )
         temp = folder / "temp"
         if temp.is_symlink() or (temp.exists() and not temp.is_dir()):
-            return ConversionCandidate(item_key, folder, "Unavailable", "temp 不是普通目录")
+            return ConversionCandidate(item_key, folder, "Unavailable", "temp is not a regular directory")
         try:
             available = self._local_pdf(folder)
         except (PipelineError, OSError) as error:
             return ConversionCandidate(item_key, folder, "Unavailable", str(error))
-        return ConversionCandidate(item_key, folder, "Ready", "可以转换", available)
+        return ConversionCandidate(item_key, folder, "Ready", "ready to convert", available)
 
     @staticmethod
     def _local_pdf(folder: Path) -> Path:
         if folder.is_symlink() or not folder.is_dir():
-            raise PipelineError(f"论文目录不是普通目录：{folder}")
+            raise PipelineError(f"paper directory is not a regular directory: {folder}")
         try:
             managed = [
                 path
@@ -80,19 +80,19 @@ class ConversionService:
                 if path.is_symlink() and _MANAGED_PDF_LINK.fullmatch(path.name)
             ]
         except OSError as error:
-            raise PipelineError(f"无法扫描论文目录中的 PDF 链接：{folder}") from error
+            raise PipelineError(f"cannot scan PDF links in paper directory: {folder}") from error
         if not managed:
-            raise PipelineError("没有受管理的 PDF 符号链接；请先运行 link-pdfs")
+            raise PipelineError("no managed PDF symlink; run link-pdfs first")
         if len(managed) > 1:
-            raise PipelineError(f"有 {len(managed)} 个受管理的 PDF 符号链接，无法确定转换对象")
+            raise PipelineError(f"{len(managed)} managed PDF symlinks; cannot determine the conversion target")
 
         link = managed[0]
         try:
             target = link.resolve(strict=True)
         except OSError as error:
-            raise PipelineError(f"PDF 符号链接已经失效：{link}") from error
+            raise PipelineError(f"PDF symlink is broken: {link}") from error
         if not target.is_file():
-            raise PipelineError(f"PDF 符号链接目标不是普通文件：{link}")
+            raise PipelineError(f"PDF symlink target is not a regular file: {link}")
         return link
 
     def list_candidates(self) -> list[ConversionCandidate]:
@@ -107,7 +107,7 @@ class ConversionService:
                         item_key,
                         folder,
                         "Unavailable",
-                        "多个论文目录声明同一 key",
+                        "multiple paper directories declare the same key",
                     )
                 )
             else:
@@ -125,11 +125,11 @@ class ConversionService:
                 item_key = key(value)
             except PipelineError as error:
                 summary.failed += 1
-                summary.messages.append(f"无效论文 key {value!r}：{error}")
+                summary.messages.append(f"invalid paper key {value!r}: {error}")
                 continue
             if item_key in seen:
                 summary.skipped += 1
-                summary.messages.append(f"论文 {item_key} 重复选择，已跳过")
+                summary.messages.append(f"paper {item_key} selected twice; skipped")
                 continue
             seen.add(item_key)
             unique_keys.append(item_key)
@@ -138,12 +138,12 @@ class ConversionService:
         for item_key in unique_keys:
             if item_key in conflicts:
                 summary.failed += 1
-                summary.messages.append(f"论文 {item_key} 有多个本地目录声明，无法转换")
+                summary.messages.append(f"paper {item_key} is declared by multiple local directories; cannot convert")
                 continue
             paths = index.complete.get(item_key, ())
             if not paths:
                 summary.failed += 1
-                summary.messages.append(f"论文 {item_key} 尚未完成入库")
+                summary.messages.append(f"paper {item_key} has not completed import")
                 continue
             folder = paths[0].parent
             try:
@@ -151,7 +151,7 @@ class ConversionService:
                     candidate = self.inspect(item_key, folder)
                     if candidate.status == "Converted":
                         summary.skipped += 1
-                        summary.messages.append(f"论文 {item_key} 已有 full.md，未调用 MinerU")
+                        summary.messages.append(f"paper {item_key} already has full.md; MinerU not called")
                         continue
                     if candidate.status != "Ready" or candidate.pdf is None:
                         raise PipelineError(f"{candidate.status}：{candidate.detail}")
@@ -168,5 +168,5 @@ class ConversionService:
                 summary.converted += 1
             except (PipelineError, OSError, UnicodeError, ValueError, TypeError) as error:
                 summary.failed += 1
-                summary.messages.append(f"论文 {item_key} 转换失败：{error}")
+                summary.messages.append(f"conversion failed for paper {item_key}: {error}")
         return summary

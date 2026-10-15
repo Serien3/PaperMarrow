@@ -43,7 +43,7 @@ def _result_staging_directory(parent: Path, prefix: str) -> Iterator[Path]:
 def positive_int(value: str) -> int:
     number = int(value)
     if number <= 0:
-        raise argparse.ArgumentTypeError("必须是大于 0 的整数")
+        raise argparse.ArgumentTypeError("must be a positive integer")
     return number
 
 
@@ -64,21 +64,21 @@ class ConversionOptions:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="使用 MinerU 精准解析 API 转换本地 PDF，并保存 Markdown 解析结果。"
+        description="Convert a local PDF with the MinerU precision parsing API and save the Markdown result."
     )
-    parser.add_argument("pdf", type=Path, help="要解析的本地 PDF 文件")
+    parser.add_argument("pdf", type=Path, help="local PDF file to parse")
     parser.add_argument(
         "-o",
         "--output",
         dest="output_root",
         type=Path,
         default=Path("mineru_output"),
-        help="结果根目录（默认：./mineru_output）",
+        help="result root directory (default: ./mineru_output)",
     )
     parser.add_argument(
         "--env-file",
         type=Path,
-        help="从指定的 .env 文件读取 MINERU_TOKEN（默认：读取当前运行目录下的 .env）",
+        help="read MINERU_TOKEN from the given .env file (default: .env in the current directory)",
     )
     parser.add_argument("--model", choices=("vlm", "pipeline"), default="vlm")
     parser.add_argument("--language", default="en")
@@ -93,33 +93,33 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _validate_common(options: ConversionOptions) -> tuple[Path, str]:
     if not isinstance(options.token, str) or not options.token.strip():
-        raise ConversionError("未设置 MINERU_TOKEN")
+        raise ConversionError("MINERU_TOKEN is not set")
     if options.model not in {"vlm", "pipeline"}:
-        raise ConversionError("MinerU model 必须是 vlm 或 pipeline")
+        raise ConversionError("MinerU model must be vlm or pipeline")
     if not isinstance(options.language, str) or not options.language.strip():
-        raise ConversionError("MinerU language 必须是非空字符串")
+        raise ConversionError("MinerU language must be a non-empty string")
     if (
         isinstance(options.timeout, bool)
         or not isinstance(options.timeout, int)
         or options.timeout <= 0
     ):
-        raise ConversionError("MinerU timeout 必须是大于 0 的整数")
+        raise ConversionError("MinerU timeout must be a positive integer")
 
     requested = options.pdf.expanduser()
     try:
         pdf = requested.resolve(strict=True)
     except (OSError, RuntimeError) as error:
-        raise ConversionError(f"PDF 文件不存在或无法解析：{requested}") from error
+        raise ConversionError(f"PDF file does not exist or cannot be resolved: {requested}") from error
     if not pdf.is_file():
-        raise ConversionError(f"输入路径不是文件：{pdf}")
+        raise ConversionError(f"input path is not a file: {pdf}")
     if requested.suffix.lower() != ".pdf":
-        raise ConversionError(f"当前程序只接受 PDF 文件：{requested}")
+        raise ConversionError(f"only PDF files are accepted: {requested}")
     try:
         size = pdf.stat().st_size
     except OSError as error:
-        raise ConversionError(f"无法读取 PDF：{pdf}") from error
+        raise ConversionError(f"cannot read PDF: {pdf}") from error
     if size > MAX_PDF_BYTES:
-        raise ConversionError("PDF 超过 MinerU 精准解析 API 的 200 MB 限制")
+        raise ConversionError("PDF exceeds the MinerU precision parsing API 200 MB limit")
     return pdf, requested.stem
 
 
@@ -128,18 +128,18 @@ def validate_options(options: ConversionOptions) -> tuple[Path, Path]:
     output_root = options.output_root.expanduser().resolve()
     destination = output_root / requested_stem
     if destination.exists() and not options.overwrite:
-        raise ConversionError(f"结果目录已存在：{destination}。如需替换，请添加 --overwrite")
+        raise ConversionError(f"result directory already exists: {destination}; add --overwrite to replace it")
     if destination.exists() and not destination.is_dir():
-        raise ConversionError(f"结果路径已存在且不是目录：{destination}")
+        raise ConversionError(f"result path already exists and is not a directory: {destination}")
     return pdf, destination
 
 
 def _reject_result_symlinks(root: Path) -> None:
     for entry in root.rglob("*"):
         if entry.is_symlink():
-            raise ConversionError(f"MinerU 结果包含符号链接，拒绝发布：{entry.relative_to(root)}")
+            raise ConversionError(f"MinerU result contains a symlink; refusing to publish: {entry.relative_to(root)}")
         if not entry.is_file() and not entry.is_dir():
-            raise ConversionError(f"MinerU 结果包含特殊文件，拒绝发布：{entry.relative_to(root)}")
+            raise ConversionError(f"MinerU result contains a special file; refusing to publish: {entry.relative_to(root)}")
 
 
 def organize_result(directory: Path) -> Path:
@@ -147,14 +147,14 @@ def organize_result(directory: Path) -> Path:
     try:
         root = directory.resolve(strict=True)
     except OSError as error:
-        raise ConversionError(f"解析结果路径不存在：{directory}") from error
+        raise ConversionError(f"parse result path does not exist: {directory}") from error
     if not root.is_dir() or root.is_symlink():
-        raise ConversionError(f"解析结果路径不是普通目录：{root}")
+        raise ConversionError(f"parse result path is not a regular directory: {root}")
     _reject_result_symlinks(root)
 
     full_markdown = root / "full.md"
     if full_markdown.is_symlink() or not full_markdown.is_file():
-        raise ConversionError("MinerU 结果缺少普通文件 full.md")
+        raise ConversionError("MinerU result lacks a regular full.md file")
 
     for entry in list(root.iterdir()):
         if entry.is_file() and entry.suffix.lower() == ".pdf":
@@ -162,10 +162,10 @@ def organize_result(directory: Path) -> Path:
 
     images_dir = root / "images"
     if images_dir.exists() and not images_dir.is_dir():
-        raise ConversionError(f"无法整理结果：{images_dir} 不是目录")
+        raise ConversionError(f"cannot organize result: {images_dir} is not a directory")
     temp_dir = root / "temp"
     if temp_dir.exists() and not temp_dir.is_dir():
-        raise ConversionError(f"无法整理结果：{temp_dir} 不是目录")
+        raise ConversionError(f"cannot organize result: {temp_dir} is not a directory")
 
     def should_stay(entry: Path) -> bool:
         if entry.name in {"images", "temp"}:
@@ -176,7 +176,7 @@ def organize_result(directory: Path) -> Path:
     for entry in to_move:
         target = temp_dir / entry.name
         if target.exists() or target.is_symlink():
-            raise ConversionError(f"无法整理结果，目标已存在：{target}")
+            raise ConversionError(f"cannot organize result, target already exists: {target}")
     temp_dir.mkdir(exist_ok=True)
     for entry in to_move:
         entry.replace(temp_dir / entry.name)
@@ -195,12 +195,12 @@ def _save_result(
         try:
             from mineru import MinerU
         except ImportError as error:
-            raise ConversionError("未安装 MinerU SDK") from error
+            raise ConversionError("MinerU SDK is not installed") from error
         client_factory = MinerU
 
-    print(f"正在提交：{pdf}")
+    print(f"Submitting: {pdf}")
     print(
-        "解析参数："
+        "Parse options: "
         f"model={options.model}, language={options.language}, "
         f"ocr={options.ocr}, formula={options.formula}, table={options.table}"
     )
@@ -217,14 +217,14 @@ def _save_result(
                 timeout=options.timeout,
             )
             if getattr(result, "state", None) != "done":
-                detail = getattr(result, "error", None) or "任务未成功完成"
-                raise ConversionError(f"MinerU 解析失败：{detail}")
+                detail = getattr(result, "error", None) or "task did not complete successfully"
+                raise ConversionError(f"MinerU parsing failed: {detail}")
             result.save_all(str(staging))
             organize_result(staging)
     except ConversionError:
         raise
     except Exception as error:
-        raise ConversionError(f"MinerU 请求或结果保存失败：{error}") from error
+        raise ConversionError(f"MinerU request or result save failed: {error}") from error
 
 
 def convert_pdf(
@@ -246,7 +246,7 @@ def convert_pdf(
     except ConversionError:
         raise
     except OSError as error:
-        raise ConversionError(f"无法发布 MinerU 结果：{error}") from error
+        raise ConversionError(f"cannot publish MinerU result: {error}") from error
     return destination
 
 
@@ -276,7 +276,7 @@ def convert_pdf_into_paper(
 ) -> Path:
     """Stage a conversion, then publish its contents directly into a paper folder."""
     if paper_folder.is_symlink() or not paper_folder.is_dir():
-        raise ConversionError(f"论文目录不是普通目录：{paper_folder}")
+        raise ConversionError(f"paper directory is not a regular directory: {paper_folder}")
     ensure_pipeline_destination_available(paper_folder)
     pdf, _ = _validate_common(options)
 
@@ -304,14 +304,14 @@ def convert_pdf_into_paper(
 
             for source, target in ordered:
                 if target.exists() or target.is_symlink():
-                    raise ConversionError(f"转换结果名称与论文目录已有内容冲突：{target}")
+                    raise ConversionError(f"conversion result name conflicts with existing content in the paper directory: {target}")
 
             published: list[tuple[Path, Path]] = []
             try:
                 for source, target in ordered:
                     if target.exists() or target.is_symlink():
                         raise ConversionError(
-                            f"转换结果名称与论文目录已有内容冲突：{target}"
+                            f"conversion result name conflicts with existing content in the paper directory: {target}"
                         )
                     if source.is_file():
                         os.link(source, target)
@@ -325,7 +325,7 @@ def convert_pdf_into_paper(
     except ConversionError:
         raise
     except (OSError, ValueError) as error:
-        raise ConversionError(f"无法发布论文转换结果：{error}") from error
+        raise ConversionError(f"cannot publish paper conversion result: {error}") from error
     return paper_folder / "full.md"
 
 
@@ -334,10 +334,10 @@ def ensure_pipeline_destination_available(paper_folder: Path) -> None:
     for name in PIPELINE_OUTPUT_NAMES:
         target = paper_folder / name
         if target.exists() or target.is_symlink():
-            raise ConversionError(f"转换结果名称与论文目录已有内容冲突：{target}")
+            raise ConversionError(f"conversion result name conflicts with existing content in the paper directory: {target}")
     temp = paper_folder / "temp"
     if temp.is_symlink() or (temp.exists() and not temp.is_dir()):
-        raise ConversionError(f"转换结果名称与论文目录已有内容冲突：{temp}")
+        raise ConversionError(f"conversion result name conflicts with existing content in the paper directory: {temp}")
 
 
 def load_vault_token(vault: Path) -> str:
@@ -346,28 +346,28 @@ def load_vault_token(vault: Path) -> str:
         token = os.environ["MINERU_TOKEN"]
         if token.strip():
             return token.strip()
-        raise ConversionError("环境变量 MINERU_TOKEN 为空")
+        raise ConversionError("environment variable MINERU_TOKEN is empty")
 
     marrow_directory = vault / ".papermarrow"
     if marrow_directory.is_symlink() or not marrow_directory.is_dir():
-        raise ConversionError(f".papermarrow 不是普通目录：{marrow_directory}")
+        raise ConversionError(f".papermarrow is not a regular directory: {marrow_directory}")
     env_file = marrow_directory / ".env"
     if env_file.is_symlink():
-        raise ConversionError(f"拒绝读取符号链接 Token 文件：{env_file}")
+        raise ConversionError(f"refusing to read symlinked token file: {env_file}")
     if env_file.exists() and not env_file.is_file():
-        raise ConversionError(f"Token 路径不是普通文件：{env_file}")
+        raise ConversionError(f"token path is not a regular file: {env_file}")
     if env_file.is_file():
         try:
             from dotenv import dotenv_values
 
             token = dotenv_values(env_file).get("MINERU_TOKEN")
         except (ImportError, OSError, ValueError) as error:
-            raise ConversionError(f"无法读取 Token 文件：{env_file}") from error
+            raise ConversionError(f"cannot read token file: {env_file}") from error
         if isinstance(token, str) and token.strip():
             return token.strip()
-        raise ConversionError(f"Token 文件缺少非空 MINERU_TOKEN：{env_file}")
+        raise ConversionError(f"token file lacks a non-empty MINERU_TOKEN: {env_file}")
     raise ConversionError(
-        f"未设置 MINERU_TOKEN；请设置环境变量或写入 {env_file}"
+        f"MINERU_TOKEN is not set; set the environment variable or write it to {env_file}"
     )
 
 
@@ -375,7 +375,7 @@ def load_env_file(path: Path) -> None:
     try:
         from dotenv import load_dotenv
     except ImportError as error:
-        raise ConversionError("未安装 python-dotenv") from error
+        raise ConversionError("python-dotenv is not installed") from error
     load_dotenv(path, override=False)
 
 
@@ -385,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.env_file is not None:
             env_file = args.env_file.expanduser().resolve()
             if not env_file.is_file():
-                raise ConversionError(f".env 文件不存在：{env_file}")
+                raise ConversionError(f".env file does not exist: {env_file}")
         else:
             env_file = Path.cwd() / ".env"
             if not env_file.is_file():
@@ -408,13 +408,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         destination = convert_pdf(options)
     except ConversionError as error:
-        print(f"错误：{error}", file=sys.stderr)
+        print(f"Error: {error}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
-        print("\n已取消。", file=sys.stderr)
+        print("\nCanceled.", file=sys.stderr)
         return 130
 
-    print(f"解析完成，结果已保存到：{destination}")
+    print(f"Parsing done; result saved to: {destination}")
     return 0
 
 

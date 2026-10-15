@@ -13,18 +13,18 @@ from .files import PipelineError
 
 def validate_url(value: str) -> str:
     if not isinstance(value, str):
-        raise PipelineError("zotero_url 必须是字符串")
+        raise PipelineError("zotero_url must be a string")
     parts = urlsplit(value.strip())
     if parts.scheme != "http" or parts.hostname not in {"localhost", "127.0.0.1", "::1"}:
-        raise PipelineError("Zotero API 必须使用本机 HTTP 回环地址")
+        raise PipelineError("Zotero API must use a local HTTP loopback address")
     if parts.username or parts.password or parts.query or parts.fragment:
-        raise PipelineError("Zotero API 地址不得包含凭据、查询参数或片段")
+        raise PipelineError("Zotero API URL must not contain credentials, a query string, or a fragment")
     return value.strip()
 
 
 def key(value: object) -> str:
     if not isinstance(value, str) or not re.fullmatch(r"[A-Z0-9]{8}", value):
-        raise PipelineError(f"Zotero key 应为 8 位大写字母或数字：{value}")
+        raise PipelineError(f"Zotero key must be 8 uppercase letters or digits: {value}")
     return value
 
 
@@ -50,34 +50,34 @@ class Zotero:
             with self.opener.open(request, timeout=10) as response:
                 server_id = response.headers.get("Zotero-Server-Id", "")
                 if self.server_id and server_id and server_id != self.server_id:
-                    raise PipelineError("Zotero 本地数据库身份在请求期间发生变化")
+                    raise PipelineError("Zotero local database identity changed during the request")
                 if server_id:
                     self.server_id = server_id
                 self.last_version = response.headers.get("Last-Modified-Version", "")
                 body = response.read()
         except HTTPError as error:
             hints = {
-                403: "请在 Zotero 设置中允许本机其他应用访问",
-                404: "请检查 Collection key，或确认附件仍存在且已下载",
+                403: "allow other applications on this machine to access Zotero in Zotero settings",
+                404: "check the Collection key, or confirm the attachment still exists and is downloaded",
             }
-            raise PipelineError(f"Zotero API 返回 {error.code}：{hints.get(error.code, error.reason)}") from error
+            raise PipelineError(f"Zotero API returned {error.code}: {hints.get(error.code, error.reason)}") from error
         except (OSError, UnicodeError, URLError) as error:
-            raise PipelineError("无法连接 Zotero Local API，请确认 Zotero 正在运行") from error
+            raise PipelineError("cannot connect to the Zotero Local API; confirm Zotero is running") from error
         return body
 
     def request(self, path: str) -> object:
         try:
             return json.loads(self._read(path).decode("utf-8"))
         except ValueError as error:
-            raise PipelineError("Zotero API 返回的内容不是有效 JSON") from error
+            raise PipelineError("Zotero API response is not valid JSON") from error
         except UnicodeError as error:
-            raise PipelineError("Zotero API 返回的 JSON 不是 UTF-8") from error
+            raise PipelineError("Zotero API JSON is not UTF-8") from error
 
     def request_text(self, path: str) -> str:
         try:
             return self._read(path).decode("utf-8").strip()
         except UnicodeError as error:
-            raise PipelineError("Zotero API 返回的文本不是 UTF-8") from error
+            raise PipelineError("Zotero API text is not UTF-8") from error
 
     def listing(self, path: str) -> list[dict]:
         result: list[dict] = []
@@ -87,11 +87,11 @@ class Zotero:
             separator = "&" if "?" in path else "?"
             page = self.request(f"{path}{separator}limit=100&start={start}")
             if not isinstance(page, list):
-                raise PipelineError("Zotero API 分页响应不是列表")
+                raise PipelineError("Zotero API pagination response is not a list")
             if self.last_version:
                 versions.add(self.last_version)
             if len(versions) > 1:
-                raise PipelineError("Zotero 数据在分页期间发生变化，请重新执行命令")
+                raise PipelineError("Zotero data changed during pagination; run the command again")
             result.extend(page)
             if len(page) < 100:
                 return result
