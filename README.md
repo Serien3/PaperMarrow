@@ -1,5 +1,7 @@
 # PaperMarrow
 
+**English** | [中文](README_zh.md)
+
 ## Overview
 
 PaperMarrow is a literature management tool for Zotero and Obsidian users. It imports the bibliographic metadata and local PDFs of a Zotero Collection into an Obsidian vault, and converts PDFs to Markdown for AI-assisted reading on demand. No files are uploaded during import; PDF conversion runs only after explicit user confirmation. All files created in the vault are plain Markdown, which can be further edited in Obsidian or any other editor.
@@ -10,7 +12,14 @@ PaperMarrow is a literature management tool for Zotero and Obsidian users. It im
 - [Key Feature](#key-feature)
 - [Requirements](#requirements)
 - [Installation](#installation)
+  - [Installation (Conda)](#installation-conda)
+  - [Installation (venv)](#installation-venv)
 - [Usage](#usage)
+  - [1. Configuration](#1-configuration)
+  - [2. Import papers](#2-import-papers)
+  - [3. Repair PDF links](#3-repair-pdf-links)
+  - [4. Convert PDFs to Markdown](#4-convert-pdfs-to-markdown)
+  - [5. Deep analysis with your AI agent](#5-deep-analysis-with-your-ai-agent)
 
 ## Key Feature
 
