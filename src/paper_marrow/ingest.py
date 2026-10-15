@@ -90,17 +90,21 @@ class Importer:
                     continue
                 partial_paths = index.partial.get(item_key, ())
                 folder = (
-                    partial_paths[0].parent
+                    partial_paths[0].parent.parent
                     if partial_paths
                     else self.vault / paper_folder_name(item_key, data)
                 )
                 if folder.is_symlink():
                     raise PipelineError(f"拒绝使用符号链接论文目录：{folder}")
                 meta_path = folder / "meta.md"
-                json_path = folder / "zotero-item.json"
+                json_path = folder / "temp" / "zotero-item.json"
                 if meta_path.exists() or meta_path.is_symlink():
                     summary.skipped += 1
                     continue
+                if json_path.parent.is_symlink() or (
+                    json_path.parent.exists() and not json_path.parent.is_dir()
+                ):
+                    raise PipelineError(f"temp 不是普通目录：{json_path.parent}")
 
                 source_data = data
                 if json_path.exists() or json_path.is_symlink():

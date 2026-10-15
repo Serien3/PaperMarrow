@@ -7,8 +7,8 @@ from pathlib import Path
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 
-from literature_pipeline.conversion import ConversionCandidate
-from literature_pipeline.conversion_tui import (
+from paper_marrow.conversion import ConversionCandidate
+from paper_marrow.conversion_tui import (
     PickerModel,
     run_conversion_picker,
     supports_tui,

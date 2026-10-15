@@ -60,7 +60,7 @@ def initialize(
     vault.mkdir(parents=True, exist_ok=True)
     if vault.is_symlink() or not vault.is_dir():
         raise PipelineError(f"vault 不是普通目录：{vault}")
-    path = vault / ".pipeline" / "config.toml"
+    path = vault / ".papermarrow" / "config.toml"
     pdf2md = _pdf2md_config(
         {
             "model": pdf2md_model,
@@ -84,7 +84,7 @@ def initialize(
 
 
 def load_config(vault: Path) -> Config:
-    path = vault / ".pipeline" / "config.toml"
+    path = vault / ".papermarrow" / "config.toml"
     try:
         config = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -150,13 +150,16 @@ def index_existing(vault: Path) -> ExistingIndex:
         if folder.is_symlink() or not folder.is_dir():
             continue
         meta_path = folder / "meta.md"
-        sidecar_path = folder / "zotero-item.json"
+        temp_path = folder / "temp"
+        sidecar_path = temp_path / "zotero-item.json"
         if meta_path.exists() or meta_path.is_symlink():
             fields = read_meta(meta_path)
             item_key = fields.get("key")
             path = meta_path
             destination = complete
         elif sidecar_path.exists() or sidecar_path.is_symlink():
+            if temp_path.is_symlink() or not temp_path.is_dir():
+                raise PipelineError(f"temp 不是普通目录：{temp_path}")
             fields = read_zotero_json(sidecar_path)
             item_key = fields.get("key")
             path = sidecar_path

@@ -72,11 +72,11 @@ def _vault(value: Path | None, *, for_init: bool = False) -> Path:
     if for_init:
         return current
     for candidate in (current, *current.parents):
-        marker = candidate / ".pipeline" / "config.toml"
+        marker = candidate / ".papermarrow" / "config.toml"
         if marker.exists() or marker.is_symlink():
             return candidate
     raise PipelineError(
-        f"无法从当前目录向上找到 .pipeline/config.toml：{current}；"
+        f"无法从当前目录向上找到 .papermarrow/config.toml：{current}；"
         "请进入已初始化的 vault，或显式提供 --vault"
     )
 

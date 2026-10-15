@@ -205,19 +205,19 @@ class VaultLock:
         relative_path: Path = Path("writer.lock"),
         busy_message: str = "此 vault 已有 Literature Pipeline 写入进程",
     ):
-        self.pipeline_directory = vault / ".pipeline"
-        self.path = vault / ".pipeline" / relative_path
+        self.papermarrow_directory = vault / ".papermarrow"
+        self.path = vault / ".papermarrow" / relative_path
         self.busy_message = busy_message
         self.handle = None
 
     def __enter__(self):
         directory = self.path.parent
-        if self.pipeline_directory.exists() and (
-            self.pipeline_directory.is_symlink() or not self.pipeline_directory.is_dir()
+        if self.papermarrow_directory.exists() and (
+            self.papermarrow_directory.is_symlink() or not self.papermarrow_directory.is_dir()
         ):
-            raise PipelineError(f".pipeline 不是可写入的普通目录：{self.pipeline_directory}")
+            raise PipelineError(f".papermarrow 不是可写入的普通目录：{self.papermarrow_directory}")
         if directory.exists() and (directory.is_symlink() or not directory.is_dir()):
-            raise PipelineError(f".pipeline 不是可写入的普通目录：{directory}")
+            raise PipelineError(f".papermarrow 不是可写入的普通目录：{directory}")
         directory.mkdir(parents=True, exist_ok=True)
         self.handle = self.path.open("a+b")
         try:

@@ -52,18 +52,17 @@ class ConversionService:
             return ConversionCandidate(item_key, folder, "Converted", "full.md 已存在")
         if full_markdown.exists() or full_markdown.is_symlink():
             return ConversionCandidate(item_key, folder, "Unavailable", "full.md 不是普通文件")
-        occupied = [
-            name
-            for name in ("images", "temp")
-            if (folder / name).exists() or (folder / name).is_symlink()
-        ]
-        if occupied:
+        images = folder / "images"
+        if images.exists() or images.is_symlink():
             return ConversionCandidate(
                 item_key,
                 folder,
                 "Unavailable",
-                "已有转换目标：" + "、".join(occupied),
+                "已有转换目标：images",
             )
+        temp = folder / "temp"
+        if temp.is_symlink() or (temp.exists() and not temp.is_dir()):
+            return ConversionCandidate(item_key, folder, "Unavailable", "temp 不是普通目录")
         try:
             available = self._local_pdf(folder)
         except (PipelineError, OSError) as error:

@@ -16,7 +16,7 @@ from .files import PipelineError
 
 
 MAX_PDF_BYTES = 200 * 1024 * 1024
-PIPELINE_OUTPUT_NAMES = ("full.md", "images", "temp")
+PIPELINE_OUTPUT_NAMES = ("full.md", "images")
 
 
 class ConversionError(PipelineError):
@@ -286,17 +286,33 @@ def convert_pdf_into_paper(
             ensure_pipeline_destination_available(paper_folder)
             entries = list(staging.iterdir())
             full_markdown = staging / "full.md"
-            ordered = [entry for entry in entries if entry != full_markdown] + [full_markdown]
+            staged_temp = staging / "temp"
+            destination_temp = paper_folder / "temp"
+            ordered: list[tuple[Path, Path]] = [
+                (entry, paper_folder / entry.name)
+                for entry in entries
+                if entry not in {full_markdown, staged_temp}
+            ]
+            if destination_temp.exists():
+                ordered.extend(
+                    (entry, destination_temp / entry.name)
+                    for entry in staged_temp.iterdir()
+                )
+            else:
+                ordered.append((staged_temp, destination_temp))
+            ordered.append((full_markdown, paper_folder / "full.md"))
 
-            for source in ordered:
-                target = paper_folder / source.name
+            for source, target in ordered:
                 if target.exists() or target.is_symlink():
                     raise ConversionError(f"转换结果名称与论文目录已有内容冲突：{target}")
 
             published: list[tuple[Path, Path]] = []
             try:
-                for source in ordered:
-                    target = paper_folder / source.name
+                for source, target in ordered:
+                    if target.exists() or target.is_symlink():
+                        raise ConversionError(
+                            f"转换结果名称与论文目录已有内容冲突：{target}"
+                        )
                     if source.is_file():
                         os.link(source, target)
                         published.append((source, target))
@@ -319,6 +335,9 @@ def ensure_pipeline_destination_available(paper_folder: Path) -> None:
         target = paper_folder / name
         if target.exists() or target.is_symlink():
             raise ConversionError(f"转换结果名称与论文目录已有内容冲突：{target}")
+    temp = paper_folder / "temp"
+    if temp.is_symlink() or (temp.exists() and not temp.is_dir()):
+        raise ConversionError(f"转换结果名称与论文目录已有内容冲突：{temp}")
 
 
 def load_vault_token(vault: Path) -> str:
@@ -329,10 +348,10 @@ def load_vault_token(vault: Path) -> str:
             return token.strip()
         raise ConversionError("环境变量 MINERU_TOKEN 为空")
 
-    pipeline_directory = vault / ".pipeline"
-    if pipeline_directory.is_symlink() or not pipeline_directory.is_dir():
-        raise ConversionError(f".pipeline 不是普通目录：{pipeline_directory}")
-    env_file = pipeline_directory / ".env"
+    marrow_directory = vault / ".papermarrow"
+    if marrow_directory.is_symlink() or not marrow_directory.is_dir():
+        raise ConversionError(f".papermarrow 不是普通目录：{marrow_directory}")
+    env_file = marrow_directory / ".env"
     if env_file.is_symlink():
         raise ConversionError(f"拒绝读取符号链接 Token 文件：{env_file}")
     if env_file.exists() and not env_file.is_file():
